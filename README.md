@@ -47,6 +47,12 @@ Vercel CLI を使う場合は、プロジェクトルートで `npx vercel` を�
 - `src/converters/` — 種類ごとに分離した変換ロジック
 - `src/App.tsx` — UI と変換フロー
 
+## MP4 → MP3 の変換エンジンについて
+
+MP4からの音声抽出には ffmpeg.wasm（`@ffmpeg/ffmpeg` + `@ffmpeg/core`）を使います。変換エンジン（`ffmpeg-core.js` / `ffmpeg-core.wasm` / ワーカー）は npm 依存としてバンドルし、`dist/assets/` へ出力してアプリと同じオリジンから配信します。外部CDNへは取得しにいかないため、CDNがブロックされている環境やオフラインでも読み込めます。
+
+`ffmpeg-core.wasm` は約31MBあり、MP4変換を実行したときに初めて読み込まれます（他の変換では読み込まれません）。エンジンはブラウザキャッシュに載るため、2回目以降は読み込みが不要です。ワーカーは `type: 'module'` で起動するため、`vite.config.ts` で `worker.format: 'es'` を指定しています。
+
 ## プライバシー
 
-SheetJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の初回のみ変換エンジンをCDNから読み込みますが、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
+SheetJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の変換エンジンもアプリと同じオリジンから配信し、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
