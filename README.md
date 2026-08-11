@@ -9,6 +9,7 @@ Excel・CSV・画像をドラッグ＆ドロップで変換する、React + Type
 - Excel（`.xlsx` / `.xls`）→ Markdownテーブル（シート・見出し行を選択可能）
 - 複数の PNG / JPEG → 1つの PDF
 - PNG / JPEG / WebP の相互変換
+- MP4からMP3音声を抽出
 - 複数ファイルの個別ダウンロード / ZIP 一括ダウンロード
 
 ## セットアップ
@@ -48,4 +49,4 @@ Vercel CLI を使う場合は、プロジェクトルートで `npx vercel` を�
 
 ## プライバシー
 
-SheetJS、jsPDF、Canvas API、JSZip を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
+SheetJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の初回のみ、変換エンジンをCDNから読み込みます。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
