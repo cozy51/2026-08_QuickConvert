@@ -1,9 +1,14 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { fetchFile } from '@ffmpeg/util';
+// 変換エンジン（ffmpeg.wasm）は外部CDNに依存せず、アプリと同じオリジンから配信する。
+import coreURL from '@ffmpeg/core?url';
+import wasmURL from '@ffmpeg/core/wasm?url';
+import classWorkerURL from '@ffmpeg/ffmpeg/worker?worker&url';
 
-const coreBaseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
 let ffmpeg: FFmpeg | undefined;
 let loading: Promise<FFmpeg> | undefined;
+
+const absolute = (url: string) => new URL(url, window.location.href).href;
 
 const withTimeout = <T>(promise: Promise<T>, milliseconds: number, message: string) => new Promise<T>((resolve, reject) => {
   const timer = window.setTimeout(() => reject(new Error(message)), milliseconds);
@@ -20,11 +25,11 @@ async function getFFmpeg(onStatus?: (message: string) => void) {
       const instance = new FFmpeg();
       try {
         onStatus?.('変換エンジンを読み込んでいます…');
-        const [coreURL, wasmURL] = await withTimeout(Promise.all([
-          toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, 'text/javascript'),
-          toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        ]), 90_000, '変換エンジンのダウンロードがタイムアウトしました');
-        await withTimeout(instance.load({ coreURL, wasmURL }), 60_000, '変換エンジンの起動がタイムアウトしました');
+        await withTimeout(instance.load({
+          classWorkerURL: absolute(classWorkerURL),
+          coreURL: absolute(coreURL),
+          wasmURL: absolute(wasmURL),
+        }), 120_000, '変換エンジンの読み込みがタイムアウトしました');
         ffmpeg = instance;
         return instance;
       } catch (error) {
@@ -37,7 +42,8 @@ async function getFFmpeg(onStatus?: (message: string) => void) {
     return await loading;
   } catch (error) {
     loading = undefined;
-    throw error instanceof Error ? error : new Error('音声変換エンジンを読み込めませんでした');
+    const detail = error instanceof Error && error.message ? `（${error.message}）` : '';
+    throw new Error(`変換エンジンを読み込めませんでした${detail}`);
   }
 }
 
