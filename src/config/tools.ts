@@ -1,9 +1,10 @@
-import { FileSpreadsheet, FileImage, FileVideo, Images, Presentation, Sheet, TableProperties } from 'lucide-react';
+import { FileSpreadsheet, FileImage, FileText, FileVideo, Images, Presentation, Sheet, TableProperties } from 'lucide-react';
 import type { ToolId } from '../types';
 export const tools: { id: ToolId; title: string; short: string; description: string; accept: string; multiple: boolean; icon: typeof Sheet; tone: string }[] = [
   { id:'excel-csv', title:'Excel → CSV', short:'Excel → CSV', description:'シートを選んでCSVへ変換', accept:'.xlsx,.xls', multiple:true, icon:FileSpreadsheet, tone:'mint' },
   { id:'csv-excel', title:'CSV → Excel', short:'CSV → Excel', description:'CSVを.xlsx形式へ変換', accept:'.csv,.tsv', multiple:true, icon:Sheet, tone:'blue' },
   { id:'excel-markdown', title:'Excel → Markdown', short:'Excel → Markdown', description:'シートをMarkdownテーブルへ変換', accept:'.xlsx,.xls', multiple:true, icon:TableProperties, tone:'blue' },
+  { id:'excel-pdf', title:'Excel → PDF', short:'Excel → PDF', description:'ブック全体を印刷範囲に合わせてPDFへ', accept:'.xlsx,.xls', multiple:true, icon:FileText, tone:'mint' },
   { id:'images-pdf', title:'画像 → PDF', short:'画像 → PDF', description:'複数の画像を1つのPDFへ', accept:'image/png,image/jpeg', multiple:true, icon:Images, tone:'violet' },
   { id:'image-format', title:'画像形式変換', short:'PNG・JPEG・WebP', description:'PNG・JPEG・WebPを相互変換', accept:'image/png,image/jpeg,image/webp', multiple:true, icon:FileImage, tone:'orange' },
   { id:'video-audio', title:'動画 → 音声', short:'MP4 → MP3', description:'MP4から音声をMP3として抽出', accept:'video/mp4,.mp4', multiple:true, icon:FileVideo, tone:'violet' },
@@ -23,6 +24,7 @@ export const conversionGroups: {
   { id:'excel', label:'Excel', icon:FileSpreadsheet, accept:'.xlsx,.xls', outputs:[
     { label:'CSV', tool:'excel-csv' },
     { label:'Markdown', tool:'excel-markdown' },
+    { label:'PDF', tool:'excel-pdf' },
   ] },
   { id:'csv', label:'CSV', icon:Sheet, accept:'.csv,.tsv', outputs:[{ label:'Excel', tool:'csv-excel' }] },
   { id:'png', label:'PNG', icon:FileImage, accept:'image/png', outputs:[
