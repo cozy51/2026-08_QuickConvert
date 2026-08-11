@@ -4,10 +4,10 @@ Excel・CSV・画像をドラッグ＆ドロップで変換する、React + Type
 
 ## 対応する変換
 
-- Excel（`.xlsx` / `.xls`）→ CSV（シート・文字コード・区切り文字を選択可能）
+- Excel（`.xlsx` / `.xlsm` / `.xls`）→ CSV（シート・文字コード・区切り文字を選択可能）
 - CSV → Excel（`.xlsx`）
-- Excel（`.xlsx` / `.xls`）→ Markdownテーブル（シート・見出し行を選択可能）
-- Excel（`.xlsx` / `.xls`）→ PDF（ブック全体・シートごとに印刷範囲を最適化）
+- Excel（`.xlsx` / `.xlsm` / `.xls`）→ Markdownテーブル（シート・見出し行を選択可能）
+- Excel（`.xlsx` / `.xlsm` / `.xls`）→ PDF（ブック全体・シートごとに印刷範囲を最適化）
 - 複数の PNG / JPEG → 1つの PDF
 - PNG / JPEG / WebP の相互変換
 - MP4からMP3音声を抽出
