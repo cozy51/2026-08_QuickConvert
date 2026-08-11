@@ -13,3 +13,22 @@ export async function excelToCsv(file: File, sheet: string | undefined, delimite
 export async function csvToExcel(file: File, delimiter: string) {
   const text=await file.text(); const wb=XLSX.read(text,{type:'string',FS:delimiter,raw:true}); return new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
+
+const escapeMarkdownCell = (value: string) => value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+
+export function rowsToMarkdown(rows: string[][], firstRowAsHeader = true) {
+  if (rows.length === 0) return '';
+  const columnCount = Math.max(...rows.map(row => row.length));
+  const normalized = rows.map(row => Array.from({ length: columnCount }, (_, index) => escapeMarkdownCell(String(row[index] ?? ''))));
+  const header = firstRowAsHeader ? normalized[0] : Array.from({ length: columnCount }, (_, index) => `列${index + 1}`);
+  const body = firstRowAsHeader ? normalized.slice(1) : normalized;
+  const line = (row: string[]) => `| ${row.join(' | ')} |`;
+  return [line(header), line(header.map(() => '---')), ...body.map(line)].join('\n') + '\n';
+}
+
+export async function excelToMarkdown(file: File, sheet?: string, firstRowAsHeader = true) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:true, cellText:true });
+  const ws = wb.Sheets[sheet || wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header:1, raw:false, defval:'', blankrows:true });
+  return new Blob([rowsToMarkdown(rows, firstRowAsHeader)], { type:'text/markdown;charset=utf-8' });
+}

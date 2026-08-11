@@ -6,6 +6,7 @@ Excel・CSV・画像をドラッグ＆ドロップで変換する、React + Type
 
 - Excel（`.xlsx` / `.xls`）→ CSV（シート・文字コード・区切り文字を選択可能）
 - CSV → Excel（`.xlsx`）
+- Excel（`.xlsx` / `.xls`）→ Markdownテーブル（シート・見出し行を選択可能）
 - 複数の PNG / JPEG → 1つの PDF
 - PNG / JPEG / WebP の相互変換
 - 複数ファイルの個別ダウンロード / ZIP 一括ダウンロード
