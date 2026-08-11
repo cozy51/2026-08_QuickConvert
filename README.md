@@ -10,6 +10,7 @@ Excel・CSV・画像をドラッグ＆ドロップで変換する、React + Type
 - 複数の PNG / JPEG → 1つの PDF
 - PNG / JPEG / WebP の相互変換
 - MP4からMP3音声を抽出
+- PowerPoint（`.pptx`）→ PDF（スライドの見た目を保った簡易変換）
 - 複数ファイルの個別ダウンロード / ZIP 一括ダウンロード
 
 ## セットアップ
@@ -47,6 +48,19 @@ Vercel CLI を使う場合は、プロジェクトルートで `npx vercel` を�
 - `src/converters/` — 種類ごとに分離した変換ロジック
 - `src/App.tsx` — UI と変換フロー
 
+## PowerPoint → PDF の再現度について
+
+PPTXの変換もブラウザ内で完結させるため、`@aiden0z/pptx-renderer` でスライドをDOMに描画し、`html2canvas` で1枚ずつ画像化して jsPDF でPDFに組み立てています。PDFのページサイズは元のスライドサイズ（pt換算）に合わせ、画像は横1920px相当（約144dpi）で貼り付けます。
+
+そのため次の制約があります。
+
+- 文字は画像として埋め込まれるため、PDF内の文字は選択・検索できません。
+- フォントは閲覧しているブラウザで利用できるものに置換されます（社内資料を変換する端末に同じフォントが入っていれば見た目は保たれます）。
+- SmartArt・アニメーション・特殊な図形効果・EMF/WMF画像などは、元と異なる見た目になることがあります。
+- 厳密な再現が必要な場合は、PowerPointの「PDFとして保存」やLibreOfficeでの変換を使ってください。
+
+PowerPoint相当の再現度をWeb側で得るには LibreOffice による変換が必要ですが、Vercel の Functions にはサイズ上限があり LibreOffice を同梱できません。高再現度が必要になった場合は、外部変換APIか、LibreOffice を載せた別サーバー（Cloud Run 等）へ切り出す構成になります。
+
 ## MP4 → MP3 の変換エンジンについて
 
 MP4からの音声抽出には ffmpeg.wasm（`@ffmpeg/ffmpeg` + `@ffmpeg/core`）を使います。変換エンジン（`ffmpeg-core.js` / `ffmpeg-core.wasm` / ワーカー）は npm 依存としてバンドルし、`dist/assets/` へ出力してアプリと同じオリジンから配信します。外部CDNへは取得しにいかないため、CDNがブロックされている環境やオフラインでも読み込めます。
@@ -55,4 +69,4 @@ MP4からの音声抽出には ffmpeg.wasm（`@ffmpeg/ffmpeg` + `@ffmpeg/core`�
 
 ## プライバシー
 
-SheetJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の変換エンジンもアプリと同じオリジンから配信し、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
+SheetJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm、pptx-renderer、html2canvas を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の変換エンジンもアプリと同じオリジンから配信し、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
