@@ -1,4 +1,4 @@
-import { FileSpreadsheet, FileImage, FileVideo, Images, Sheet, TableProperties } from 'lucide-react';
+import { FileSpreadsheet, FileImage, FileVideo, Images, Presentation, Sheet, TableProperties } from 'lucide-react';
 import type { ToolId } from '../types';
 export const tools: { id: ToolId; title: string; short: string; description: string; accept: string; multiple: boolean; icon: typeof Sheet; tone: string }[] = [
   { id:'excel-csv', title:'Excel → CSV', short:'Excel → CSV', description:'シートを選んでCSVへ変換', accept:'.xlsx,.xls', multiple:true, icon:FileSpreadsheet, tone:'mint' },
@@ -7,10 +7,11 @@ export const tools: { id: ToolId; title: string; short: string; description: str
   { id:'images-pdf', title:'画像 → PDF', short:'画像 → PDF', description:'複数の画像を1つのPDFへ', accept:'image/png,image/jpeg', multiple:true, icon:Images, tone:'violet' },
   { id:'image-format', title:'画像形式変換', short:'PNG・JPEG・WebP', description:'PNG・JPEG・WebPを相互変換', accept:'image/png,image/jpeg,image/webp', multiple:true, icon:FileImage, tone:'orange' },
   { id:'video-audio', title:'動画 → 音声', short:'MP4 → MP3', description:'MP4から音声をMP3として抽出', accept:'video/mp4,.mp4', multiple:true, icon:FileVideo, tone:'violet' },
+  { id:'pptx-pdf', title:'PowerPoint → PDF', short:'PPTX → PDF', description:'スライドの見た目を保ってPDFへ変換', accept:'.pptx', multiple:true, icon:Presentation, tone:'orange' },
 ];
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
-export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'mp4';
+export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'mp4' | 'pptx';
 
 export const conversionGroups: {
   id: ConversionSource;
@@ -40,5 +41,8 @@ export const conversionGroups: {
   ] },
   { id:'mp4', label:'MP4', icon:FileVideo, accept:'video/mp4,.mp4', outputs:[
     { label:'MP3', tool:'video-audio' },
+  ] },
+  { id:'pptx', label:'PowerPoint', icon:Presentation, accept:'.pptx', outputs:[
+    { label:'PDF', tool:'pptx-pdf' },
   ] },
 ];
