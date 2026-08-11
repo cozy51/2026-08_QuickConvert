@@ -1,20 +1,22 @@
 import { jsPDF } from 'jspdf';
 import { readWorkbook } from './workbook-read';
-import type { Cell, CellAnchor, CellStyle, Edge, Sheet } from './workbook-read';
+import type { Cell, CellAnchor, CellStyle, Edge, Sheet, Shape } from './workbook-read';
 
 // ブック全体をPDFにする。シートごとに用紙の向きと倍率を決め、
 // 幅が収まらなければ列を分割、高さが収まらなければ行で改ページする（Excelの印刷に近い挙動）。
 // セルの塗り・罫線・フォント・配置・画像はCanvasへ直接描く。
 export type PaperSize = 'a4' | 'a3';
 export type PageOrientation = 'auto' | 'portrait' | 'landscape';
-export type FitMode = 'width' | 'page' | 'none';
+export type FitMode = 'file' | 'width' | 'page' | 'none';
 export type GridLineMode = 'auto' | 'on' | 'off';
-export type ExcelPdfOptions = { paper: PaperSize; orientation: PageOrientation; fit: FitMode; repeatHeader: boolean; gridLines: GridLineMode };
+export type RepeatMode = 'auto' | 'on' | 'off';
+export type ExcelPdfOptions = { paper: PaperSize; orientation: PageOrientation; fit: FitMode; repeatHeader: RepeatMode; gridLines: GridLineMode; sheetLabel: boolean };
 
-export const defaultExcelPdfOptions: ExcelPdfOptions = { paper:'a4', orientation:'auto', fit:'width', repeatHeader:true, gridLines:'auto' };
+export const defaultExcelPdfOptions: ExcelPdfOptions = { paper:'a4', orientation:'auto', fit:'width', repeatHeader:'auto', gridLines:'auto', sheetLabel:false };
 
 const PAPER_MM: Record<PaperSize, { width: number; height: number }> = { a4:{ width:210, height:297 }, a3:{ width:297, height:420 } };
 const MARGIN_MM = 10;
+const MIN_MARGIN_MM = 5;
 const PX_PER_MM = 96 / 25.4;
 const MIN_WIDTH_SCALE = 0.35; // 幅を1ページに収めるときの下限。これ以下になる場合は列を分割する
 const TARGET_DPI = 150;
@@ -40,28 +42,32 @@ const runLength = (list: number[], position: number) => {
 };
 
 // ページに入る列の範囲へ分割する（1列が上限より広い場合はその列だけで1ブロック）
-function splitColumns(cols: number[], maxWidth: number): Block[] {
+// forced に入っている位置（その列の後）では必ず改ページする
+function splitColumns(cols: number[], maxWidth: number, forced: Set<number>): Block[] {
   const blocks: Block[] = [];
   let start = 0;
   let width = 0;
   for (let index = 0; index < cols.length; index++) {
     if (width > 0 && width + cols[index] > maxWidth) { blocks.push({ start, end: index - 1, width }); start = index; width = 0; }
     width += cols[index];
+    if (forced.has(index) && index < cols.length - 1) { blocks.push({ start, end: index, width }); start = index + 1; width = 0; }
   }
-  blocks.push({ start, end: cols.length - 1, width });
+  if (start < cols.length) blocks.push({ start, end: cols.length - 1, width });
   return blocks;
 }
 
 // ページに入る行の範囲へ分割する（2ページ目以降は繰り返す見出し行の高さを差し引く）
-function splitRows(rows: number[], maxHeight: number, headerRow: number | undefined) {
+// forced に入っている位置（その行の後）では必ず改ページする
+function splitRows(rows: number[], maxHeight: number, titleRows: number[], forced: Set<number>) {
   const pages: number[][] = [];
-  const headerHeight = headerRow === undefined ? 0 : rows[headerRow];
+  const headerHeight = sum(titleRows.map(index => rows[index] ?? 0));
   let current: number[] = [];
   let height = 0;
   for (let index = 0; index < rows.length; index++) {
     if (current.length > 0 && height + rows[index] > maxHeight) { pages.push(current); current = []; height = headerHeight; }
     current.push(index);
     height += rows[index];
+    if (forced.has(index) && index < rows.length - 1) { pages.push(current); current = []; height = headerHeight; }
   }
   if (current.length) pages.push(current);
   return pages;
@@ -174,6 +180,7 @@ function drawPage({ sheet, columns, lines, caption, captionHeight, scale, raster
   ctx.fillRect(0, 0, width, height);
 
   // シート名とページ番号
+  if (caption && captionHeight > 0) {
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, width, captionHeight);
@@ -183,6 +190,7 @@ function drawPage({ sheet, columns, lines, caption, captionHeight, scale, raster
   ctx.textBaseline = 'middle';
   ctx.fillText(caption, 0, captionHeight / 2);
   ctx.restore();
+  }
 
   const x = [0];
   for (const columnWidth of widths) x.push(x[x.length - 1] + columnWidth);
@@ -250,28 +258,93 @@ function drawPage({ sheet, columns, lines, caption, captionHeight, scale, raster
     drawCellText(ctx, item.cell, box, { left: clipLeft, top: item.top, width: clipRight - clipLeft, height: item.height });
   }
 
+  // グリッド上の位置（列・行の小数指定）をページ上のpxへ変換する
+  const locate = (gridCol: number, gridRow: number) => {
+    const columnIndex = Math.floor(gridCol);
+    const rowIndex = Math.floor(gridRow);
+    const column = columnsOnPage.get(columnIndex);
+    const row = rowsOnPage.get(rowIndex);
+    if (column === undefined || row === undefined) return undefined;
+    return {
+      x: x[column] + (gridCol - columnIndex) * (sheet.cols[columnIndex] ?? 0),
+      y: y[row] + (gridRow - rowIndex) * (sheet.rows[rowIndex] ?? 0),
+    };
+  };
+  const spanSize = (sizes: number[], from: number, to: number) => {
+    const start = Math.floor(from);
+    const end = Math.floor(to);
+    let total = -(from - start) * (sizes[start] ?? 0);
+    for (let index = start; index < end; index++) total += sizes[index] ?? 0;
+    total += (to - end) * (sizes[end] ?? 0);
+    return total;
+  };
+
   for (const picture of sheet.pictures) {
-    const startColumn = columnsOnPage.get(Math.floor(picture.col));
-    const startRow = rowsOnPage.get(Math.floor(picture.row));
-    if (startColumn === undefined || startRow === undefined) continue; // このページに載らない画像は描かない
-    const left = x[startColumn] + (picture.col - Math.floor(picture.col)) * sheet.cols[Math.floor(picture.col)];
-    const top = y[startRow] + (picture.row - Math.floor(picture.row)) * sheet.rows[Math.floor(picture.row)];
-    let pictureWidth = picture.width;
-    let pictureHeight = picture.height;
-    if ((pictureWidth === undefined || pictureHeight === undefined) && picture.toCol !== undefined && picture.toRow !== undefined) {
-      pictureWidth = sum(sheet.cols.slice(Math.floor(picture.col), Math.ceil(picture.toCol)));
-      pictureHeight = sum(sheet.rows.slice(Math.floor(picture.row), Math.ceil(picture.toRow)));
-    }
-    if (!pictureWidth || !pictureHeight) { pictureWidth = picture.source.width; pictureHeight = picture.source.height; }
+    const spot = locate(picture.col, picture.row);
+    if (!spot) continue; // このページに載らない画像は描かない
+    let pictureWidth = picture.toCol !== undefined ? spanSize(sheet.cols, picture.col, picture.toCol) : picture.width;
+    let pictureHeight = picture.toRow !== undefined ? spanSize(sheet.rows, picture.row, picture.toRow) : picture.height;
+    if (!pictureWidth || !pictureHeight) { pictureWidth = picture.width ?? picture.source.width; pictureHeight = picture.height ?? picture.source.height; }
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, captionHeight, width, height - captionHeight);
     ctx.clip();
-    ctx.drawImage(picture.source, left, top, pictureWidth, pictureHeight);
+    ctx.drawImage(picture.source, spot.x, spot.y, pictureWidth, pictureHeight);
     ctx.restore();
   }
 
+  for (const shape of sheet.shapes) drawShape(ctx, sheet, shape, locate, spanSize, { top: captionHeight, width, height });
+
   return canvas;
+}
+
+type Locator = (col: number, row: number) => { x: number; y: number } | undefined;
+type Spanner = (sizes: number[], from: number, to: number) => number;
+
+// 罫線や画像のあとに、Excelの図形（四角・直線）を重ねる
+function drawShape(ctx: CanvasRenderingContext2D, sheet: Sheet, shape: Shape, locate: Locator, spanSize: Spanner, page: { top: number; width: number; height: number }) {
+  const start = locate(Math.min(shape.col, shape.toCol), Math.min(shape.row, shape.toRow));
+  if (!start) return; // このページに載らない図形は描かない
+  const shapeWidth = Math.abs(spanSize(sheet.cols, shape.col, shape.toCol));
+  const shapeHeight = Math.abs(spanSize(sheet.rows, shape.row, shape.toRow));
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, page.top, page.width, page.height - page.top);
+  ctx.clip();
+  if (shape.dash) ctx.setLineDash(shape.dash);
+  ctx.lineWidth = shape.strokeWidth;
+  if (shape.kind === 'line') {
+    if (shape.stroke) {
+      ctx.strokeStyle = shape.stroke;
+      ctx.beginPath();
+      ctx.moveTo(shape.flipH ? start.x + shapeWidth : start.x, shape.flipV ? start.y + shapeHeight : start.y);
+      ctx.lineTo(shape.flipH ? start.x : start.x + shapeWidth, shape.flipV ? start.y : start.y + shapeHeight);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  if (shape.fill) { ctx.fillStyle = shape.fill; ctx.fillRect(start.x, start.y, shapeWidth, shapeHeight); }
+  if (shape.stroke) { ctx.strokeStyle = shape.stroke; ctx.strokeRect(start.x + 0.5, start.y + 0.5, shapeWidth, shapeHeight); }
+  if (shape.text) {
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.rect(start.x, start.y, shapeWidth, shapeHeight);
+    ctx.clip();
+    ctx.fillStyle = shape.text.color;
+    ctx.font = `${shape.text.bold ? 'bold ' : ''}${Math.max(6, Math.round(shape.text.fontSize * PT_TO_PX))}px ${FONT_STACK}`;
+    ctx.textAlign = shape.text.hAlign;
+    ctx.textBaseline = 'middle';
+    const lines = shape.text.text.split('\n');
+    const lineHeight = Math.round(shape.text.fontSize * PT_TO_PX * 1.25);
+    const total = lines.length * lineHeight;
+    const startY = shape.text.vAlign === 'top' ? start.y + lineHeight / 2
+      : shape.text.vAlign === 'bottom' ? start.y + shapeHeight - total + lineHeight / 2
+      : start.y + (shapeHeight - total) / 2 + lineHeight / 2;
+    const textX = shape.text.hAlign === 'center' ? start.x + shapeWidth / 2 : shape.text.hAlign === 'right' ? start.x + shapeWidth - PAD_PX : start.x + PAD_PX;
+    lines.forEach((line, index) => ctx.fillText(line, textX, startY + index * lineHeight));
+  }
+  ctx.restore();
 }
 
 const toImageBytes = (canvas: HTMLCanvasElement, type: string, quality?: number) => new Promise<ArrayBuffer>((resolve, reject) => {
@@ -296,45 +369,102 @@ export async function excelToPdf(file: File, options: ExcelPdfOptions, onStatus?
       onStatus?.(`シートを変換しています… ${sheetIndex + 1}/${sheets.length}（${sheet.name}）`);
       const tableWidth = sum(sheet.cols);
       const tableHeight = sum(sheet.rows);
-      const gridLines = options.gridLines === 'auto' ? sheet.gridLines : options.gridLines === 'on';
+      const gridLines = options.gridLines === 'auto' ? sheet.print.gridLines : options.gridLines === 'on';
+      // ファイルの余白設定（インチ）を使う。極端に狭いものは最低値まで広げる
+      const margin = sheet.print.margins
+        ? {
+            left: clamp(sheet.print.margins.left * 25.4, 0, 40),
+            right: clamp(sheet.print.margins.right * 25.4, 0, 40),
+            top: clamp(sheet.print.margins.top * 25.4, MIN_MARGIN_MM, 40),
+            bottom: clamp(sheet.print.margins.bottom * 25.4, 0, 40),
+          }
+        : { left: MARGIN_MM, right: MARGIN_MM, top: MARGIN_MM, bottom: MARGIN_MM };
 
       // 用紙の向き：指定がなければファイルの印刷設定を優先し、無ければ縮小率が小さくて済む向きを選ぶ
       const fitFor = (landscape: boolean) => {
-        const width = (landscape ? paper.height : paper.width) - MARGIN_MM * 2;
-        const height = (landscape ? paper.width : paper.height) - MARGIN_MM * 2;
+        const width = (landscape ? paper.height : paper.width) - margin.left - margin.right;
+        const height = (landscape ? paper.width : paper.height) - margin.top - margin.bottom;
         const byWidth = Math.min(1, width / (tableWidth / PX_PER_MM));
-        return options.fit === 'page' ? Math.min(byWidth, height / ((tableHeight + CAPTION_PX) / PX_PER_MM)) : byWidth;
+        return options.fit === 'page' ? Math.min(byWidth, height / ((tableHeight + (options.sheetLabel ? CAPTION_PX : 0)) / PX_PER_MM)) : byWidth;
       };
       const landscape = options.orientation === 'auto'
-        ? sheet.landscape ?? fitFor(true) > fitFor(false)
+        ? sheet.print.landscape ?? fitFor(true) > fitFor(false)
         : options.orientation === 'landscape';
-      const contentWidth = (landscape ? paper.height : paper.width) - MARGIN_MM * 2;
-      const contentHeight = (landscape ? paper.width : paper.height) - MARGIN_MM * 2;
+      const contentWidth = (landscape ? paper.height : paper.width) - margin.left - margin.right;
+      const contentHeight = (landscape ? paper.width : paper.height) - margin.top - margin.bottom;
 
-      const maxBlockWidth = options.fit === 'page' ? Infinity : options.fit === 'none' ? contentWidth * PX_PER_MM : contentWidth * PX_PER_MM / MIN_WIDTH_SCALE;
-      const blocks = splitColumns(sheet.cols, maxBlockWidth);
-      // 見出しの繰り返し：先頭行は改ページのたび、先頭列は列を分けたページのたびに付ける
-      const headerRow = options.repeatHeader && sheet.rows.length > 1 ? 0 : undefined;
-      const headerColumn = options.repeatHeader && blocks.length > 1 ? 0 : undefined;
+      // Excelの印刷設定に従うときの倍率（「N ページ幅に収める」または「倍率 x%」）
+      const fileScale = () => {
+        if (sheet.print.fitToPage) {
+          const acrossWidth = sheet.print.fitToWidth ?? 1;
+          const acrossHeight = sheet.print.fitToHeight ?? 0;
+          const byWidth = acrossWidth > 0 ? contentWidth * acrossWidth / (tableWidth / PX_PER_MM) : Infinity;
+          const byHeight = acrossHeight > 0 ? contentHeight * acrossHeight / ((tallestSegment + (options.sheetLabel ? CAPTION_PX : 0)) / PX_PER_MM) : Infinity;
+          const scale = Math.min(byWidth, byHeight);
+          return Number.isFinite(scale) ? Math.min(1, scale) : 1;
+        }
+        return clamp((sheet.print.scale ?? 100) / 100, 0.1, 4);
+      };
+      const sheetScale = options.fit === 'file' ? fileScale() : undefined;
+
+      // シート上の行番号・列番号を、この範囲の添字へ変換する
+      const forcedRows = new Set(sheet.print.rowBreaks.map(row => row - sheet.firstRow).filter(index => index >= 0 && index < sheet.rows.length - 1));
+      const forcedCols = new Set(sheet.print.colBreaks.map(col => col - sheet.firstCol).filter(index => index >= 0 && index < sheet.cols.length - 1));
+      // 改ページで区切られた区間のうち、一番高いものを基準に「1ページに収める」倍率を決める
+      const segmentHeights = (() => {
+        const heights: number[] = [];
+        let height = 0;
+        sheet.rows.forEach((rowHeight, index) => {
+          height += rowHeight;
+          if (forcedRows.has(index)) { heights.push(height); height = 0; }
+        });
+        heights.push(height);
+        return heights.filter(value => value > 0);
+      })();
+      const tallestSegment = segmentHeights.length ? Math.max(...segmentHeights) : tableHeight;
+
+      const maxBlockWidth = options.fit === 'page' ? Infinity
+        : options.fit === 'file' ? contentWidth * PX_PER_MM / Math.max(sheetScale ?? 1, MIN_WIDTH_SCALE)
+        : options.fit === 'none' ? contentWidth * PX_PER_MM
+        : contentWidth * PX_PER_MM / MIN_WIDTH_SCALE;
+      const blocks = splitColumns(sheet.cols, maxBlockWidth, forcedCols);
+      // 見出しの繰り返し：既定はExcelの印刷タイトル設定に従う（設定が無ければ繰り返さない）
+      const titleRows = options.repeatHeader === 'off' ? []
+        : options.repeatHeader === 'on' ? (sheet.rows.length > 1 ? [0] : [])
+        : sheet.print.titleRows
+          ? Array.from({ length: sheet.print.titleRows[1] - sheet.print.titleRows[0] + 1 }, (_, index) => sheet.print.titleRows![0] + index - sheet.firstRow)
+              .filter(index => index >= 0 && index < sheet.rows.length)
+          : [];
+      const titleColumns = options.repeatHeader === 'off' ? []
+        : options.repeatHeader === 'on' ? (blocks.length > 1 ? [0] : [])
+        : sheet.print.titleCols
+          ? Array.from({ length: sheet.print.titleCols[1] - sheet.print.titleCols[0] + 1 }, (_, index) => sheet.print.titleCols![0] + index - sheet.firstCol)
+              .filter(index => index >= 0 && index < sheet.cols.length)
+          : [];
 
       for (const block of blocks) {
         const range = Array.from({ length: block.end - block.start + 1 }, (_, index) => block.start + index);
-        const columns = headerColumn !== undefined && range[0] !== headerColumn ? [headerColumn, ...range] : range;
+        const repeatedColumns = titleColumns.filter(index => index < range[0]);
+        const columns = repeatedColumns.length ? [...repeatedColumns, ...range] : range;
         const pageWidth = sum(columns.map(c => sheet.cols[c]));
         const byWidth = Math.min(1, contentWidth / (pageWidth / PX_PER_MM));
         const scale = options.fit === 'none' ? 1
-          : options.fit === 'page' ? Math.min(byWidth, contentHeight / ((tableHeight + CAPTION_PX) / PX_PER_MM))
+          : options.fit === 'file' ? Math.min(sheetScale ?? 1, byWidth === 1 ? Infinity : byWidth)
+          : options.fit === 'page' ? Math.min(byWidth, contentHeight / ((tallestSegment + (options.sheetLabel ? CAPTION_PX : 0)) / PX_PER_MM))
           : byWidth;
-        const captionHeight = Math.round(CAPTION_PX / clamp(scale, 0.3, 1));
+        const captionHeight = options.sheetLabel ? Math.round(CAPTION_PX / clamp(scale, 0.3, 1)) : 0;
         const usableHeight = options.fit === 'page' ? Infinity : contentHeight * PX_PER_MM / scale - captionHeight;
-        const rowPages = splitRows(sheet.rows, usableHeight, headerRow);
+        const rowPages = splitRows(sheet.rows, usableHeight, titleRows, forcedRows);
         const rasterScale = clamp(scale * TARGET_DPI / 96, 0.6, 2);
 
         for (const [pageIndex, rowIndexes] of rowPages.entries()) {
           if (++pageCount > MAX_PAGES) throw new ConversionError(`ページ数が${MAX_PAGES}を超えました。用紙サイズを大きくするか、シートを分けてください`);
           const columnLabel = blocks.length > 1 ? `・列${block.start + 1}〜${block.end + 1}` : '';
-          const caption = rowPages.length > 1 || blocks.length > 1 ? `${sheet.name}（${pageIndex + 1}/${rowPages.length}${columnLabel}）` : sheet.name;
-          const lines = headerRow !== undefined && rowIndexes[0] !== headerRow ? [headerRow, ...rowIndexes] : rowIndexes;
+          const caption = !options.sheetLabel ? ''
+            : rowPages.length > 1 || blocks.length > 1 ? `${sheet.name}（${pageIndex + 1}/${rowPages.length}${columnLabel}）`
+            : sheet.name;
+          const repeatedRows = titleRows.filter(index => index < rowIndexes[0]);
+          const lines = repeatedRows.length ? [...repeatedRows, ...rowIndexes] : rowIndexes;
           const canvas = drawPage({ sheet, columns, lines, caption, captionHeight, scale, rasterScale, gridLines });
           // 写真を含むページはJPEG、罫線と文字だけのページはPNGの方が軽く鮮明
           const image = sheet.pictures.length
@@ -346,7 +476,8 @@ export async function excelToPdf(file: File, options: ExcelPdfOptions, onStatus?
           if (height > contentHeight) { width *= contentHeight / height; height = contentHeight; }
           if (!pdf) pdf = new jsPDF({ unit:'mm', format:[paper.width, paper.height], orientation: landscape ? 'landscape' : 'portrait', compress:true });
           else pdf.addPage([paper.width, paper.height], landscape ? 'landscape' : 'portrait');
-          pdf.addImage(image, sheet.pictures.length ? 'JPEG' : 'PNG', MARGIN_MM, MARGIN_MM, width, height);
+          const left = sheet.print.horizontalCentered ? Math.max(margin.left, (paper[landscape ? 'height' : 'width'] - width) / 2) : margin.left;
+          pdf.addImage(image, sheet.pictures.length ? 'JPEG' : 'PNG', left, margin.top, width, height);
         }
       }
     }
