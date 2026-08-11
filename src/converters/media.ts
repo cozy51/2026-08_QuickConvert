@@ -1,7 +1,8 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { fetchFile } from '@ffmpeg/util';
+import coreURL from '@ffmpeg/core/dist/esm/ffmpeg-core.js?url';
+import wasmURL from '@ffmpeg/core/dist/esm/ffmpeg-core.wasm?url';
 
-const coreBaseUrl = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
 let ffmpeg: FFmpeg | undefined;
 let loading: Promise<FFmpeg> | undefined;
 
@@ -20,10 +21,6 @@ async function getFFmpeg(onStatus?: (message: string) => void) {
       const instance = new FFmpeg();
       try {
         onStatus?.('変換エンジンを読み込んでいます…');
-        const [coreURL, wasmURL] = await withTimeout(Promise.all([
-          toBlobURL(`${coreBaseUrl}/ffmpeg-core.js`, 'text/javascript'),
-          toBlobURL(`${coreBaseUrl}/ffmpeg-core.wasm`, 'application/wasm'),
-        ]), 90_000, '変換エンジンのダウンロードがタイムアウトしました');
         await withTimeout(instance.load({ coreURL, wasmURL }), 60_000, '変換エンジンの起動がタイムアウトしました');
         ffmpeg = instance;
         return instance;
