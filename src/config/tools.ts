@@ -5,15 +5,15 @@ export const tools: { id: ToolId; title: string; short: string; description: str
   { id:'csv-excel', title:'CSV → Excel', short:'CSV → Excel', description:'CSVを.xlsx形式へ変換', accept:'.csv,.tsv', multiple:true, icon:Sheet, tone:'blue' },
   { id:'excel-markdown', title:'Excel → Markdown', short:'Excel → Markdown', description:'シートをMarkdownテーブルへ変換', accept:'.xlsx,.xlsm,.xls', multiple:true, icon:TableProperties, tone:'blue' },
   { id:'excel-pdf', title:'Excel → PDF', short:'Excel → PDF', description:'ブック全体を印刷範囲に合わせてPDFへ', accept:'.xlsx,.xlsm,.xls', multiple:true, icon:FileText, tone:'mint' },
-  { id:'images-pdf', title:'画像 → PDF', short:'画像 → PDF', description:'複数の画像を1つのPDFへ', accept:'image/png,image/jpeg', multiple:true, icon:Images, tone:'violet' },
-  { id:'image-format', title:'画像形式変換', short:'PNG・JPEG・WebP', description:'PNG・JPEG・WebPを相互変換', accept:'image/png,image/jpeg,image/webp', multiple:true, icon:FileImage, tone:'orange' },
+  { id:'images-pdf', title:'画像 → PDF', short:'画像 → PDF', description:'複数の画像を1つのPDFへ', accept:'image/png,image/jpeg,image/svg+xml,image/heic,image/heif,.heic,.heif', multiple:true, icon:Images, tone:'violet' },
+  { id:'image-format', title:'画像形式変換', short:'PNG・JPEG・WebP・SVG・HEIC', description:'画像をPNG・JPEG・WebPへ変換', accept:'image/png,image/jpeg,image/webp,image/svg+xml,image/heic,image/heif,.heic,.heif', multiple:true, icon:FileImage, tone:'orange' },
   { id:'video-audio', title:'動画 → 音声', short:'MP4 → MP3', description:'MP4から音声をMP3として抽出', accept:'video/mp4,.mp4', multiple:true, icon:FileVideo, tone:'violet' },
   { id:'pptx-pdf', title:'PowerPoint → PDF', short:'PPTX → PDF', description:'スライドの見た目を保ってPDFへ変換', accept:'.pptx', multiple:true, icon:Presentation, tone:'orange' },
   { id:'word-pdf', title:'Word → PDF', short:'Word → PDF', description:'Word文書をPDFへ変換', accept:'.docx', multiple:true, icon:FileType2, tone:'blue' },
 ];
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
-export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'mp4' | 'pptx' | 'word';
+export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'svg' | 'heic' | 'mp4' | 'pptx' | 'word';
 
 export const conversionGroups: {
   id: ConversionSource;
@@ -41,6 +41,18 @@ export const conversionGroups: {
   { id:'webp', label:'WebP', icon:FileImage, accept:'image/webp', outputs:[
     { label:'PNG', tool:'image-format', format:'png' },
     { label:'JPEG', tool:'image-format', format:'jpeg' },
+  ] },
+  { id:'svg', label:'SVG', icon:FileImage, accept:'image/svg+xml,.svg', outputs:[
+    { label:'PDF', tool:'images-pdf' },
+    { label:'PNG', tool:'image-format', format:'png' },
+    { label:'JPEG', tool:'image-format', format:'jpeg' },
+    { label:'WebP', tool:'image-format', format:'webp' },
+  ] },
+  { id:'heic', label:'HEIC', icon:FileImage, accept:'image/heic,image/heif,.heic,.heif', outputs:[
+    { label:'PDF', tool:'images-pdf' },
+    { label:'PNG', tool:'image-format', format:'png' },
+    { label:'JPEG', tool:'image-format', format:'jpeg' },
+    { label:'WebP', tool:'image-format', format:'webp' },
   ] },
   { id:'mp4', label:'MP4', icon:FileVideo, accept:'video/mp4,.mp4', outputs:[
     { label:'MP3', tool:'video-audio' },
