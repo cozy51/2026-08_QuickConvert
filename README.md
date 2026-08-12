@@ -1,6 +1,6 @@
 # QuickConvert
 
-Excel・CSV・画像をドラッグ＆ドロップで変換する、React + TypeScript 製の Web アプリです。ファイルはサーバーへアップロードせず、変換処理はブラウザ内で完結します。
+Excel・Word・CSV・画像をドラッグ＆ドロップで変換する、React + TypeScript 製の Web アプリです。ファイルはサーバーへアップロードせず、変換処理はブラウザ内で完結します。
 
 ## 対応する変換
 
@@ -11,6 +11,7 @@ Excel・CSV・画像をドラッグ＆ドロップで変換する、React + Type
 - 複数の PNG / JPEG → 1つの PDF
 - PNG / JPEG / WebP の相互変換
 - MP4からMP3音声を抽出
+- Word（`.docx`）→ PDF（文章・表・画像・基本書式を再現）
 - PowerPoint（`.pptx`）→ PDF（スライドの見た目を保った簡易変換）
 - 複数ファイルの個別ダウンロード / ZIP 一括ダウンロード
 

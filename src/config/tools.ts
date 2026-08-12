@@ -1,4 +1,4 @@
-import { FileSpreadsheet, FileImage, FileText, FileVideo, Images, Presentation, Sheet, TableProperties } from 'lucide-react';
+import { FileSpreadsheet, FileImage, FileText, FileType2, FileVideo, Images, Presentation, Sheet, TableProperties } from 'lucide-react';
 import type { ToolId } from '../types';
 export const tools: { id: ToolId; title: string; short: string; description: string; accept: string; multiple: boolean; icon: typeof Sheet; tone: string }[] = [
   { id:'excel-csv', title:'Excel → CSV', short:'Excel → CSV', description:'シートを選んでCSVへ変換', accept:'.xlsx,.xlsm,.xls', multiple:true, icon:FileSpreadsheet, tone:'mint' },
@@ -9,10 +9,11 @@ export const tools: { id: ToolId; title: string; short: string; description: str
   { id:'image-format', title:'画像形式変換', short:'PNG・JPEG・WebP', description:'PNG・JPEG・WebPを相互変換', accept:'image/png,image/jpeg,image/webp', multiple:true, icon:FileImage, tone:'orange' },
   { id:'video-audio', title:'動画 → 音声', short:'MP4 → MP3', description:'MP4から音声をMP3として抽出', accept:'video/mp4,.mp4', multiple:true, icon:FileVideo, tone:'violet' },
   { id:'pptx-pdf', title:'PowerPoint → PDF', short:'PPTX → PDF', description:'スライドの見た目を保ってPDFへ変換', accept:'.pptx', multiple:true, icon:Presentation, tone:'orange' },
+  { id:'word-pdf', title:'Word → PDF', short:'Word → PDF', description:'Word文書をPDFへ変換', accept:'.docx', multiple:true, icon:FileType2, tone:'blue' },
 ];
 
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
-export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'mp4' | 'pptx';
+export type ConversionSource = 'excel' | 'csv' | 'png' | 'jpeg' | 'webp' | 'mp4' | 'pptx' | 'word';
 
 export const conversionGroups: {
   id: ConversionSource;
@@ -46,5 +47,8 @@ export const conversionGroups: {
   ] },
   { id:'pptx', label:'PowerPoint', icon:Presentation, accept:'.pptx', outputs:[
     { label:'PDF', tool:'pptx-pdf' },
+  ] },
+  { id:'word', label:'Word', icon:FileType2, accept:'.docx', outputs:[
+    { label:'PDF', tool:'word-pdf' },
   ] },
 ];
