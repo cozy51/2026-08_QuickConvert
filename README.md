@@ -8,8 +8,8 @@ Excel・Word・CSV・画像をドラッグ＆ドロップで変換する、React
 - CSV → Excel（`.xlsx`）
 - Excel（`.xlsx` / `.xlsm` / `.xls`）→ Markdownテーブル（シート・見出し行を選択可能）
 - Excel（`.xlsx` / `.xlsm` / `.xls`）→ PDF（ブック全体・書式と画像を再現し、シートごとに印刷範囲を最適化）
-- 複数の PNG / JPEG → 1つの PDF
-- PNG / JPEG / WebP の相互変換
+- 複数の PNG / JPEG / SVG / HEIC → 1つの PDF
+- PNG / JPEG / WebP / SVG / HEIC → PNG / JPEG / WebP（HEICはブラウザの対応状況に依存）
 - MP4からMP3音声を抽出
 - Word（`.docx`）→ PDF（文章・表・画像・基本書式を再現）
 - PowerPoint（`.pptx`）→ PDF（スライドの見た目を保った簡易変換）
