@@ -16,6 +16,7 @@
     "@ffmpeg/util": "^0.12.1",
     "encoding-japanese": "^2.2.0",
     "exceljs": "^4.4.0",
+    "heic-to": "^1.5.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "jszip": "^3.10.1",
