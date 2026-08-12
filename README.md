@@ -111,6 +111,12 @@ MP4からの音声抽出には ffmpeg.wasm（`@ffmpeg/ffmpeg` + `@ffmpeg/core`�
 
 `ffmpeg-core.wasm` は約31MBあり、MP4変換を実行したときに初めて読み込まれます（他の変換では読み込まれません）。エンジンはブラウザキャッシュに載るため、2回目以降は読み込みが不要です。ワーカーは `type: 'module'` で起動するため、`vite.config.ts` で `worker.format: 'es'` を指定しています。
 
+## HEIC / HEIF の読み込みについて
+
+HEIC/HEIF を標準で表示できるブラウザは Safari 系だけで、Edge・Chrome・Firefox では `<img>` に読み込めません。そこで画像変換では、まずブラウザ標準のデコードを試し、失敗した場合だけ libheif の WebAssembly ビルド（`heic-to`）で展開してから Canvas に描画します。Safari では従来どおり標準デコードだけで完結し、デコーダーは読み込まれません。
+
+デコーダーは約3MB（gzip 約730KB）の別チャンクで、HEIC変換を実行したときに初めて読み込まれます（他の変換では読み込まれません）。展開はワーカー内で行うため、変換中も画面は固まりません。CSPで `unsafe-eval` を許可しなくても動くよう `heic-to/csp` を使っています。
+
 ## プライバシー
 
-SheetJS、ExcelJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm、pptx-renderer、html2canvas を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の変換エンジンもアプリと同じオリジンから配信し、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
+SheetJS、ExcelJS、jsPDF、Canvas API、JSZip、ffmpeg.wasm、heic-to（libheif）、pptx-renderer、html2canvas を使用し、すべての処理をクライアント側で行います。選択したファイルや変換結果が QuickConvert のサーバーへ送信されることはありません。MP4変換の変換エンジンもアプリと同じオリジンから配信し、動画自体はブラウザの外へ送信されません。変換結果は画面上の「変換ファイルを破棄」からオブジェクト URL を解放できます。
